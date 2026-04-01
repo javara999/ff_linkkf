@@ -18,6 +18,8 @@ from .setup import P
 
 
 class ModuleBasic(PluginModuleBase):
+    template_prefix = "linkkf"
+
     def __init__(self, P):
         super(ModuleBasic, self).__init__(P, name="main")
         default_route_socketio_module(self)
@@ -74,7 +76,7 @@ class ModuleBasic(PluginModuleBase):
         arg = self.P.ModelSetting.to_dict() if self.P.ModelSetting is not None else {}
         arg["package_name"] = self.P.package_name
         arg["sub"] = sub
-        arg["template_name"] = f"{self.P.package_name}_{sub}"
+        arg["template_name"] = f"{self.template_prefix}_{sub}"
 
         if sub == "setting":
             arg["scheduler"] = str(F.scheduler.is_include(self.P.package_name))
@@ -86,7 +88,7 @@ class ModuleBasic(PluginModuleBase):
                 else ""
             )
 
-        return render_template(f"{self.P.package_name}_{sub}.html", arg=arg)
+        return render_template(f"{self.template_prefix}_{sub}.html", arg=arg)
 
     def process_ajax(self, sub, req):
         try:

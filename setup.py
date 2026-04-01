@@ -33,6 +33,21 @@ def _get_declared_package_name():
     return os.path.basename(os.path.dirname(__file__))
 
 
+def _sync_runtime_package_metadata():
+    runtime_package_name = _get_runtime_package_name()
+    info_path = os.path.join(os.path.dirname(__file__), "info.yaml")
+    try:
+        with open(info_path, encoding="utf-8") as file:
+            info = yaml.safe_load(file) or {}
+        if str(info.get("package_name", "")).strip() != runtime_package_name:
+            info["package_name"] = runtime_package_name
+            with open(info_path, "w", encoding="utf-8") as file:
+                yaml.safe_dump(info, file, allow_unicode=True, sort_keys=False)
+    except Exception:
+        pass
+    return runtime_package_name
+
+
 def ensure_sqlalchemy_bind(package_name=None):
     package_name = package_name or _get_declared_package_name()
     runtime_package_name = _get_runtime_package_name()
@@ -84,13 +99,15 @@ def _ensure_requirements():
     subprocess.check_call([sys.executable, "-m", "pip", "install", *missing])
 
 
+runtime_package_name = _sync_runtime_package_metadata()
+
 setting = {
     "filepath": __file__,
     "use_db": True,
     "use_default_setting": True,
     "home_module": "category",
     "menu": {
-        "uri": __package__,
+        "uri": runtime_package_name,
         "name": "linkkf",
         "list": [
             {"uri": "setting", "name": "설정"},
