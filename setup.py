@@ -35,13 +35,28 @@ def _get_declared_package_name():
 
 def ensure_sqlalchemy_bind(package_name=None):
     package_name = package_name or _get_declared_package_name()
+    runtime_package_name = _get_runtime_package_name()
     try:
         if getattr(F, "app", None) is None:
             return package_name
         binds = F.app.config.setdefault("SQLALCHEMY_BINDS", {})
+        runtime_uri = binds.get(runtime_package_name)
+        if runtime_uri in [None, ""]:
+            runtime_db_path = os.path.join(F.config["path_data"], "db", f"{runtime_package_name}.db")
+            runtime_uri = f"sqlite:///{runtime_db_path}?check_same_thread=False"
+            binds[runtime_package_name] = runtime_uri
         if package_name not in binds:
-            db_path = os.path.join(F.config["path_data"], "db", f"{package_name}.db")
-            binds[package_name] = f"sqlite:///{db_path}?check_same_thread=False"
+            binds[package_name] = runtime_uri
+
+        db_instance = getattr(F, "db", None)
+        if db_instance is not None:
+            try:
+                engines = db_instance.engines
+                runtime_engine = engines.get(runtime_package_name)
+                if runtime_engine is not None and package_name not in engines:
+                    engines[package_name] = runtime_engine
+            except Exception:
+                pass
     except Exception:
         pass
     return package_name
