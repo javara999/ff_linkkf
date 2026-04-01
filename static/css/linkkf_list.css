@@ -1,0 +1,9 @@
+#list_div img {
+  max-width: 100%;
+  height: auto;
+}
+
+#page1,
+#page2 {
+  margin: 12px 0;
+}

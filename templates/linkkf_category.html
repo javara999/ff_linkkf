@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<div id="linkkf_wrapper">
+  <div class="input-group mb-3">
+    <input
+      id="input_search"
+      type="search"
+      class="form-control rounded"
+      placeholder="작품명 검색"
+      aria-label="작품명 검색"
+      aria-describedby="search-addon"
+    />
+    <button id="btn_search" type="button" class="btn btn-primary">검색</button>
+  </div>
+
+  <div id="anime_category" class="btn-group mb-3" role="group" aria-label="linkkf categories">
+    <button id="ing" type="button" class="btn btn-success active">애니</button>
+    <button id="movie" type="button" class="btn btn-primary">극장판</button>
+    <button id="complete" type="button" class="btn btn-dark">성인</button>
+    <button id="top_view" type="button" class="btn btn-warning">최신</button>
+  </div>
+
+  <div id="screen_movie_list" class="container"></div>
+
+  <div class="spinner" id="spinner" style="display: none">
+    <div class="double-bounce1"></div>
+    <div class="double-bounce2"></div>
+  </div>
+</div>
+
+<link
+  href="{{ url_for('.static', filename='css/%s.css' % arg['template_name']) }}"
+  type="text/css"
+  rel="stylesheet"
+/>
+<script>
+  "use strict";
+  const package_name = '{{ arg["package_name"] }}';
+  const linkkf_url = "{{ arg['linkkf_url'] }}";
+  const request_path = "./request";
+  const placeholder_image = "./static/img_loader_x200.svg";
+</script>
+<script src="{{ url_for('.static', filename='js/%s.js' % arg['template_name']) }}"></script>
+{% endblock %}

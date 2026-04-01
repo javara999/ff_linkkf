@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+<div>
+  <form id="form_search" class="mb-3">
+    <div class="form-row align-items-center">
+      <div class="col-md-4 mb-2">
+        <select id="order" name="order" class="form-control form-control-sm">
+          <option value="desc">최신순</option>
+          <option value="asc">오래된순</option>
+        </select>
+      </div>
+      <div class="col-md-3 mb-2">
+        <select id="option" name="option" class="form-control form-control-sm">
+          <option value="finished" selected>완료/실패/취소</option>
+          <option value="all">전체</option>
+          <option value="completed">완료</option>
+          <option value="error">실패</option>
+          <option value="canceled">취소</option>
+          <option value="downloading">진행중</option>
+        </select>
+      </div>
+      <div class="col-md-5 mb-2 d-flex">
+        <input
+          id="search_word"
+          name="search_word"
+          class="form-control form-control-sm mr-2"
+          type="text"
+          placeholder="작품명 검색"
+          aria-label="Search"
+        />
+        <button id="search" class="btn btn-sm btn-outline-success mr-2">검색</button>
+        <button id="reset_btn" class="btn btn-sm btn-outline-secondary">리셋</button>
+      </div>
+    </div>
+  </form>
+
+  <div id="page1"></div>
+  <div id="list_div"></div>
+  <div id="page2"></div>
+</div>
+
+<link
+  href="{{ url_for('.static', filename='css/%s.css' % arg['template_name']) }}"
+  type="text/css"
+  rel="stylesheet"
+/>
+<script type="text/javascript">
+  const package_name = "{{arg['package_name']}}";
+</script>
+<script src="{{ url_for('.static', filename='js/%s.js' % arg['template_name']) }}"></script>
+{% endblock %}

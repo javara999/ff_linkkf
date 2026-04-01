@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<div id="request">
+  <form id="program_list" style="padding-bottom: 1em;">
+    <div class="card p-lg-5 p-md-3 py-2 border-light">
+      {{
+        macros.setting_input_text_and_buttons(
+          'code',
+          '작품 코드',
+          [['analysis_btn', '분석'], ['go_linkkf_btn', 'LinkKF 열기'], ['go_modal_airing', '최신']],
+          desc='예시: https://linkkf.tv/ani/405619/ 또는 405619'
+        )
+      }}
+    </div>
+  </form>
+
+  <form id="airing_list_form">
+    <div id="airing_list"></div>
+  </form>
+
+  <form id="program_auto_form">
+    <div id="episode_list"></div>
+  </form>
+</div>
+
+<link href="{{ url_for('.static', filename='css/%s.css' % arg['template_name']) }}" type="text/css" rel="stylesheet"/>
+<script type="text/javascript">
+const package_name = "{{ arg['package_name'] }}";
+const linkkf_url = "{{ arg['linkkf_url'] }}";
+const pageParams = new URLSearchParams(window.location.search);
+const initialCodeFromQuery = pageParams.get("code");
+
+$(document).ready(function () {
+  if ("{{ arg['current_code'] }}" !== "") {
+    document.getElementById("code").value = "{{ arg['current_code'] }}";
+  }
+
+  if (initialCodeFromQuery !== null && initialCodeFromQuery !== "") {
+    document.getElementById("code").value = initialCodeFromQuery;
+  }
+});
+</script>
+<script src="{{ url_for('.static', filename='js/%s.js' % arg['template_name']) }}"></script>
+{% endblock %}

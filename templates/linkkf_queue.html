@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mb-3 d-flex flex-wrap align-items-center">
+  <button id="reset_btn" class="btn btn-sm btn-warning mr-2 mb-2">초기화</button>
+  <button id="delete_completed_btn" class="btn btn-sm btn-secondary mr-2 mb-2">완료 항목 제거</button>
+  <button id="go_ffmpeg_btn" class="btn btn-sm btn-info mb-2">Go FFMPEG</button>
+</div>
+
+<div id="queue_empty" class="alert alert-secondary" style="display: none;">
+  대기열이 비어 있습니다.
+</div>
+
+<div class="table-responsive">
+  <table class="table table-sm table-hover">
+    <thead>
+      <tr>
+        <th>코드</th>
+        <th>생성 시각</th>
+        <th>파일명</th>
+        <th>상태</th>
+        <th>동작</th>
+      </tr>
+    </thead>
+    <tbody id="download_list_div"></tbody>
+  </table>
+</div>
+
+<script type="text/javascript">
+(() => {
+  if (window.__linkkfQueueInitialized === true) {
+    return;
+  }
+  window.__linkkfQueueInitialized = true;
+
+  const packageName = "{{ arg['package_name'] }}";
+  const socketUrl = `${window.location.protocol}//${window.location.host}/${packageName}/main`;
+  const socket = io(socketUrl);
+  const listContainer = document.getElementById("download_list_div");
+  const emptyBox = document.getElementById("queue_empty");
+
+  const escapeHtml = (value) =>
+    String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+
+  function makeProgress(id, percent, label) {
+    const safePercent = Number(percent || 0);
+    return `
+      <div class="progress">
+        <div
+          id="progress_${escapeHtml(id)}"
+          class="progress-bar"
+          role="progressbar"
+          style="width: ${safePercent}%"
+          aria-valuenow="${safePercent}"
+          aria-valuemin="0"
+          aria-valuemax="100"
+        >
+          <span id="progress_${escapeHtml(id)}_label">${escapeHtml(label)}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderQueue(data) {
+    if (!Array.isArray(data) || data.length === 0) {
+      listContainer.innerHTML = "";
+      emptyBox.style.display = "block";
+      return;
+    }
+
+    emptyBox.style.display = "none";
+    let html = "";
+    for (const item of data) {
+      const label = item.ffmpeg_percent && item.ffmpeg_percent !== 0
+        ? `${item.ffmpeg_status_kor} (${item.ffmpeg_percent}%)`
+        : item.ffmpeg_status_kor;
+      const fileName = `${escapeHtml(item.info.program_title || "")}<br>${escapeHtml(item.info.filename || "")}`;
+
+      html += `
+        <tr>
+          <td>${escapeHtml(item.entity_id)}</td>
+          <td>${escapeHtml(item.created_time)}</td>
+          <td>${fileName}</td>
+          <td>${makeProgress(item.entity_id, item.ffmpeg_percent, label)}</td>
+          <td>
+            <button class="btn btn-sm btn-danger mr-1 mb-1" data-command="cancel" data-id="${escapeHtml(item.entity_id)}">취소</button>
+            <button class="btn btn-sm btn-outline-secondary mb-1" data-command="delete" data-id="${escapeHtml(item.entity_id)}">삭제</button>
+          </td>
+        </tr>
+      `;
+    }
+    listContainer.innerHTML = html;
+  }
+
+  function updateStatus(data) {
+    const progress = document.getElementById(`progress_${data.plugin_id}`);
+    const label = document.getElementById(`progress_${data.plugin_id}_label`);
+    const percent = data.data && data.data.percent ? data.data.percent : 0;
+    if (progress) {
+      progress.style.width = `${percent}%`;
+      progress.setAttribute("aria-valuenow", percent);
+    }
+    if (label) {
+      const speed = data.data && data.data.current_speed ? ` x${data.data.current_speed}` : "";
+      label.textContent = `${data.status} (${percent}%)${speed}`;
+    }
+  }
+
+  function programAutoCommand(payload) {
+    $.ajax({
+      url: "/" + packageName + "/ajax/program_auto_command",
+      type: "POST",
+      cache: false,
+      data: payload,
+      dataType: "json",
+      success: function (ret) {
+        if (ret.ret === "notify") {
+          $.notify(`<strong>${ret.log}</strong>`, { type: "warning" });
+        }
+      },
+    });
+  }
+
+  socket.on("on_connect", function (data) {
+    renderQueue(data);
+  });
+
+  socket.on("status", function (data) {
+    updateStatus(data);
+  });
+
+  socket.on("list_refresh", function (data) {
+    renderQueue(data);
+  });
+
+  $("body").on("click", "button[data-command='cancel']", function (e) {
+    e.preventDefault();
+    programAutoCommand({ command: "cancel", entity_id: $(this).data("id") });
+  });
+
+  $("body").on("click", "#reset_btn", function (e) {
+    e.preventDefault();
+    programAutoCommand({ command: "reset", entity_id: -1 });
+  });
+
+  $("body").on("click", "#delete_completed_btn", function (e) {
+    e.preventDefault();
+    programAutoCommand({ command: "delete_completed", entity_id: -1 });
+  });
+
+  $("body").on("click", "#go_ffmpeg_btn", function (e) {
+    e.preventDefault();
+    window.location.href = "/ffmpeg";
+  });
+})();
+</script>
+{% endblock %}
