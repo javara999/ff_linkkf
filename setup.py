@@ -16,6 +16,10 @@ REQUIRED_PACKAGES = [
 ]
 
 
+def _get_runtime_package_name():
+    return (__package__ or "").split(".")[0] or os.path.basename(os.path.dirname(__file__))
+
+
 def _get_declared_package_name():
     info_path = os.path.join(os.path.dirname(__file__), "info.yaml")
     try:
@@ -41,6 +45,17 @@ def ensure_sqlalchemy_bind(package_name=None):
     except Exception:
         pass
     return package_name
+
+
+def ensure_sqlalchemy_binds():
+    names = []
+    for candidate in [_get_declared_package_name(), _get_runtime_package_name()]:
+        candidate = str(candidate or "").strip()
+        if candidate != "" and candidate not in names:
+            names.append(candidate)
+    for name in names:
+        ensure_sqlalchemy_bind(name)
+    return names
 
 
 def _ensure_requirements():
@@ -75,9 +90,9 @@ setting = {
     "default_route": "single",
 }
 
-
-ensure_sqlalchemy_bind()
+ensure_sqlalchemy_binds()
 P = create_plugin_instance(setting)
+ensure_sqlalchemy_binds()
 ensure_sqlalchemy_bind(P.package_name)
 _ensure_requirements()
 

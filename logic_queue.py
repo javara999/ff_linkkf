@@ -82,6 +82,16 @@ class LogicQueue(object):
     current_ffmpeg_count = 0
 
     @staticmethod
+    def _get_setting(key, default=None):
+        try:
+            value = ModelSetting.get(key)
+            if value in [None, ""]:
+                return default
+            return value
+        except Exception:
+            return default
+
+    @staticmethod
     def queue_start():
         try:
             if LogicQueue.download_queue is None:
@@ -104,16 +114,17 @@ class LogicQueue(object):
 
     @staticmethod
     def _make_save_path(info):
-        save_path = ModelSetting.get("download_path")
-        if ModelSetting.get("auto_make_folder") == "True":
+        save_path = LogicQueue._get_setting("download_path", os.path.join(F.config["path_data"], "linkkf"))
+        if LogicQueue._get_setting("auto_make_folder", "True") == "True":
             save_path = os.path.join(save_path, info["save_folder"])
-            if ModelSetting.get("linkkf_auto_make_season_folder") == "True":
+            if LogicQueue._get_setting("linkkf_auto_make_season_folder", "True") == "True":
                 save_path = os.path.join(save_path, f"Season {int(info['season'])}")
         return save_path
 
     @staticmethod
     def _make_headers(video_info):
-        referer = video_info[1] or f"{ModelSetting.get('linkkf_url').rstrip('/')}/"
+        linkkf_url = str(LogicQueue._get_setting("linkkf_url", "https://linkkf.tv")).rstrip("/")
+        referer = video_info[1] or f"{linkkf_url}/"
         return {
             "user-agent": (
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -376,7 +387,8 @@ class LogicQueue(object):
         while True:
             entity = None
             try:
-                while LogicQueue.current_ffmpeg_count >= int(ModelSetting.get("max_ffmpeg_process_count")):
+                max_count = int(LogicQueue._get_setting("max_ffmpeg_process_count", "4"))
+                while LogicQueue.current_ffmpeg_count >= max_count:
                     time.sleep(1)
 
                 entity = LogicQueue.download_queue.get()
