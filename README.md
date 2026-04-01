@@ -1,6 +1,6 @@
 # linkkf
 
-FlaskFarm용 `linkkf.tv` 플러그인입니다.
+FlaskFarm용 플러그인입니다.
 
 설치 전 의존 패키지:
 `pip install -r requirements.txt`
