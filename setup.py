@@ -1,7 +1,10 @@
 import importlib.util
+import os
 import subprocess
 import sys
+import yaml
 
+from framework import F
 from plugin import *
 
 
@@ -11,6 +14,33 @@ REQUIRED_PACKAGES = [
     ("requests-cache", "requests_cache"),
     ("lxml", "lxml"),
 ]
+
+
+def _get_declared_package_name():
+    info_path = os.path.join(os.path.dirname(__file__), "info.yaml")
+    try:
+        with open(info_path, encoding="utf-8") as file:
+            info = yaml.safe_load(file) or {}
+        package_name = str(info.get("package_name", "")).strip()
+        if package_name != "":
+            return package_name
+    except Exception:
+        pass
+    return os.path.basename(os.path.dirname(__file__))
+
+
+def ensure_sqlalchemy_bind(package_name=None):
+    package_name = package_name or _get_declared_package_name()
+    try:
+        if getattr(F, "app", None) is None:
+            return package_name
+        binds = F.app.config.setdefault("SQLALCHEMY_BINDS", {})
+        if package_name not in binds:
+            db_path = os.path.join(F.config["path_data"], "db", f"{package_name}.db")
+            binds[package_name] = f"sqlite:///{db_path}?check_same_thread=False"
+    except Exception:
+        pass
+    return package_name
 
 
 def _ensure_requirements():
@@ -46,7 +76,9 @@ setting = {
 }
 
 
+ensure_sqlalchemy_bind()
 P = create_plugin_instance(setting)
+ensure_sqlalchemy_bind(P.package_name)
 _ensure_requirements()
 
 try:
