@@ -1,4 +1,3 @@
-# linkkf
 
 FlaskFarm용 플러그인입니다.
 
