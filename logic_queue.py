@@ -116,10 +116,34 @@ class LogicQueue(object):
     def _make_save_path(info):
         save_path = LogicQueue._get_setting("download_path", os.path.join(F.config["path_data"], "linkkf"))
         if LogicQueue._get_setting("auto_make_folder", "True") == "True":
-            save_path = os.path.join(save_path, info["save_folder"])
+            save_folder = str(info.get("save_folder") or info.get("program_title") or info.get("program_code") or "linkkf").strip()
+            save_path = os.path.join(save_path, save_folder)
             if LogicQueue._get_setting("linkkf_auto_make_season_folder", "True") == "True":
-                save_path = os.path.join(save_path, f"Season {int(info['season'])}")
+                try:
+                    season = int(info.get("season") or 1)
+                except Exception:
+                    season = 1
+                save_path = os.path.join(save_path, f"Season {season}")
         return save_path
+
+    @staticmethod
+    def _ensure_download_info(info):
+        from .logic_linkkf import LogicLinkkf
+
+        if info.get("save_folder") in [None, ""]:
+            info["save_folder"] = str(
+                info.get("program_title") or info.get("program_code") or info.get("code") or "linkkf"
+            ).strip()
+        if info.get("season") in [None, ""]:
+            info["season"] = "1"
+        if info.get("filename") in [None, ""]:
+            info["filename"] = LogicLinkkf.get_filename(
+                info.get("save_folder") or "linkkf",
+                info.get("season") or "1",
+                info.get("title") or info.get("code") or "episode",
+                1,
+            )
+        return info
 
     @staticmethod
     def _make_headers(video_info):
@@ -345,6 +369,7 @@ class LogicQueue(object):
     def _prepare_download(entity):
         from .logic_linkkf import LogicLinkkf
 
+        entity.info = LogicQueue._ensure_download_info(entity.info)
         LogicQueue._ensure_db_entity(entity.info)
         entity.url = LogicLinkkf.get_video_url(entity.info["url"])
         logger.debug("resolved video url: %s", entity.url)
@@ -356,7 +381,10 @@ class LogicQueue(object):
 
         save_path = LogicQueue._make_save_path(entity.info)
         os.makedirs(save_path, exist_ok=True)
-        target_path = os.path.join(save_path, entity.info["filename"])
+        filename = entity.info.get("filename")
+        if filename in [None, ""]:
+            raise ValueError(f"missing filename for episode: {entity.info.get('code')}")
+        target_path = os.path.join(save_path, filename)
 
         if os.path.exists(target_path):
             LogicQueue._set_entity_status(entity, 100, 100, {"percent": 100})
@@ -374,11 +402,12 @@ class LogicQueue(object):
             return None
 
         headers = LogicQueue._make_headers(entity.url)
-        LogicQueue._download_subtitle(entity.url, save_path, entity.info["filename"], headers)
+        LogicQueue._download_subtitle(entity.url, save_path, filename, headers)
 
         return {
             "video_url": entity.url[0],
             "save_path": save_path,
+            "filename": filename,
             "headers": headers,
         }
 
@@ -401,7 +430,7 @@ class LogicQueue(object):
 
                 ffmpeg_instance = SupportFfmpeg(
                     prepared["video_url"],
-                    entity.info["filename"],
+                    prepared["filename"],
                     save_path=prepared["save_path"],
                     headers=prepared["headers"],
                     callback_id=str(entity.entity_id),

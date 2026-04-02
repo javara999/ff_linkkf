@@ -1122,13 +1122,14 @@ class LogicLinkkf(object):
                 #    else:
                 #        epi_no = '%.1f'%float(title)
                 #    epi_no = "%s-pt1" % epi_no
-                epi_no = total_epi
+                epi_no = int(total_epi)
                 if epi_no < 10:
                     epi_no = "0%s" % epi_no
                 else:
                     epi_no = "%s" % epi_no
 
-                if int(season) < 10:
+                season = int(season)
+                if season < 10:
                     season = "0%s" % season
                 else:
                     season = "%s" % season
@@ -1144,6 +1145,16 @@ class LogicLinkkf(object):
         except Exception as e:
             logger.error("Exception:%s", e)
             logger.error(traceback.format_exc())
+            safe_title = Util.change_text_for_use_filename(str(maintitle or "linkkf")).strip() or "linkkf"
+            try:
+                safe_season = int(season)
+            except Exception:
+                safe_season = 1
+            try:
+                safe_epi = int(total_epi)
+            except Exception:
+                safe_epi = 1
+            return f"{safe_title}.S{safe_season:02d}E{safe_epi:02d}.720p-LK.mp4"
 
     @staticmethod
     def _extract_player_payload(html_text):
