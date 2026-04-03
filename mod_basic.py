@@ -79,6 +79,11 @@ class ModuleBasic(PluginModuleBase):
         arg["template_name"] = f"{self.template_prefix}_{sub}"
 
         if sub == "setting":
+            arg["whitelist_program"] = (
+                self.P.ModelSetting.get("whitelist_program")
+                if self.P.ModelSetting is not None
+                else ""
+            ) or ""
             arg["scheduler"] = str(F.scheduler.is_include(self.P.package_name))
             arg["is_running"] = str(F.scheduler.is_running(self.P.package_name))
         elif sub in ["request", "queue", "list"]:
