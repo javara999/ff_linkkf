@@ -503,6 +503,7 @@ class LogicLinkkf(object):
                 return LogicLinkkf.current_data
             else:
                 ret["ret"] = False
+                ret["data"] = whitelist_programs
                 ret["log"] = "No current data!!"
         except Exception as e:
             logger.error("Exception:%s", e)
@@ -551,22 +552,35 @@ class LogicLinkkf(object):
         logger.debug(f"args: {args}")
         try:
 
-            if len(args) == 0:
-                code = str(LogicLinkkf.current_data["code"])
+            if len(args) == 0 or args[0] in [None, ""]:
+                if LogicLinkkf.current_data is None:
+                    raise Exception("No current data")
+                code = str(LogicLinkkf.current_data["code"]).strip()
+                return_current_data = True
             else:
-                # code = str(args[0])
-                code = str(args[0]["data_code"])
+                payload = args[0]
+                return_current_data = False
+                if isinstance(payload, dict):
+                    code = str(
+                        payload.get("data_code")
+                        or payload.get("code")
+                        or payload.get("program_code")
+                        or ""
+                    ).strip()
+                else:
+                    code = str(payload).strip()
 
-            whitelist_program = ModelSetting.get("whitelist_program")
+            if code == "":
+                raise Exception("No code")
+
+            whitelist_program = ModelSetting.get("whitelist_program") or ""
             whitelist_programs = [
                 str(x.strip().replace(" ", ""))
                 for x in whitelist_program.replace("\n", ",").split(",")
             ]
+            whitelist_programs = [x for x in whitelist_programs if x != ""]
             if code not in whitelist_programs:
                 whitelist_programs.append(code)
-                whitelist_programs = filter(
-                    lambda x: x != "", whitelist_programs
-                )  # remove blank code
                 whitelist_program = ",".join(whitelist_programs)
                 entity = (
                     db.session.query(ModelSetting)
@@ -574,11 +588,18 @@ class LogicLinkkf(object):
                     .with_for_update()
                     .first()
                 )
-                entity.value = whitelist_program
+                if entity is None:
+                    entity = ModelSetting("whitelist_program", whitelist_program)
+                    db.session.add(entity)
+                else:
+                    entity.value = whitelist_program
                 db.session.commit()
                 ret["ret"] = True
                 ret["code"] = code
-                if len(args) == 0:
+                ret["data"] = whitelist_programs
+                if return_current_data:
+                    LogicLinkkf.current_data["ret"] = True
+                    LogicLinkkf.current_data["whitelist_program"] = whitelist_program
                     return LogicLinkkf.current_data
                 else:
                     return ret

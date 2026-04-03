@@ -170,7 +170,10 @@ class ModuleBasic(PluginModuleBase):
                 return jsonify(LogicLinkkf.apply_new_season(req.form["new_season"]))
             if sub == "add_whitelist":
                 payload = req.get_json()
-                ret = LogicLinkkf.add_whitelist(payload if payload is not None else None)
+                if payload is None:
+                    ret = LogicLinkkf.add_whitelist()
+                else:
+                    ret = LogicLinkkf.add_whitelist(payload)
                 return jsonify(ret)
             if sub == "add_queue":
                 code = req.form["code"]
