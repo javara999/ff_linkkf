@@ -508,6 +508,8 @@ class LogicLinkkf(object):
                 ret["data"] = whitelist_programs
                 ret["whitelist_program"] = ",".join(whitelist_programs)
                 ret["data"] = whitelist_programs
+                ret["whitelist_program"] = ",".join(whitelist_programs)
+                ret["data"] = whitelist_programs
                 ret["log"] = "No current data!!"
         except Exception as e:
             logger.error("Exception:%s", e)

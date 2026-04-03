@@ -30,7 +30,7 @@
     const extraAttrs = (attrs || [])
       .map((item) => ` data-${item.key}="${escapeHtml(item.value)}"`)
       .join("");
-    return `<button id="${escapeHtml(id)}" class="btn btn-sm ${extraClass} mr-1 mb-1"${extraAttrs}>${escapeHtml(text)}</button>`;
+    return `<button type="button" id="${escapeHtml(id)}" class="btn btn-sm ${extraClass} mr-1 mb-1"${extraAttrs}>${escapeHtml(text)}</button>`;
   };
 
   const mButtonGroup = (inner) =>
@@ -289,11 +289,11 @@
       url: `/${package_name}/ajax/add_whitelist`,
       type: "POST",
       cache: false,
+      data: { code: currentData?.code || code || "" },
       dataType: "json",
       success: function (ret) {
         if (ret.ret) {
           notifySuccess("추가되었습니다.");
-          renderProgram(ret);
         } else {
           notifyWarning(ret.log || "추가에 실패했습니다.");
         }
