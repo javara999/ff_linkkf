@@ -504,6 +504,10 @@ class LogicLinkkf(object):
             else:
                 ret["ret"] = False
                 ret["data"] = whitelist_programs
+                ret["whitelist_program"] = ",".join(whitelist_programs)
+                ret["data"] = whitelist_programs
+                ret["whitelist_program"] = ",".join(whitelist_programs)
+                ret["data"] = whitelist_programs
                 ret["log"] = "No current data!!"
         except Exception as e:
             logger.error("Exception:%s", e)
@@ -597,12 +601,10 @@ class LogicLinkkf(object):
                 ret["ret"] = True
                 ret["code"] = code
                 ret["data"] = whitelist_programs
-                if return_current_data:
-                    LogicLinkkf.current_data["ret"] = True
+                ret["whitelist_program"] = whitelist_program
+                if return_current_data and LogicLinkkf.current_data is not None:
                     LogicLinkkf.current_data["whitelist_program"] = whitelist_program
-                    return LogicLinkkf.current_data
-                else:
-                    return ret
+                return ret
             else:
                 ret["ret"] = False
                 ret["log"] = "이미 추가되어 있습니다."

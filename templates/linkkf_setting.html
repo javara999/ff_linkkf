@@ -3,7 +3,7 @@
 <div>
   {{ macros.m_button_group([['globalSettingSaveBtn', '설정 저장']]) }}
   <form id="setting">
-    {{ macros.setting_input_text_and_buttons('linkkf_url', 'Linkkf 주소', [['go_btn', '열기']], value=arg['linkkf_url']) }}
+    {{ macros.setting_input_text_and_buttons('linkkf_url', 'LinkKF 주소', [['go_btn', '열기']], value=arg['linkkf_url'], desc=['기본 주소는 https://linkkf.tv']) }}
     {{ macros.setting_input_text('download_path', '다운로드 폴더', value=arg['download_path']) }}
     {{ macros.setting_checkbox('auto_make_folder', '작품 폴더 생성', value=arg['auto_make_folder']) }}
     {{ macros.setting_checkbox('linkkf_auto_make_season_folder', '시즌 폴더 생성', value=arg['linkkf_auto_make_season_folder']) }}
@@ -11,10 +11,10 @@
     {{ macros.setting_input_int('max_ffmpeg_process_count', '동시 다운로드 수', value=arg['max_ffmpeg_process_count']) }}
     {{ macros.setting_input_text('auto_interval', '자동 실행 주기', value=arg['auto_interval'], col='3', placeholder='*/20 * * * *') }}
     {{ macros.setting_checkbox('auto_start', '시작 시 자동 실행', value=arg['auto_start']) }}
-    {{ macros.setting_input_textarea('whitelist_program', '자동 다운로드 코드', value=arg['whitelist_program']) }}
+    {{ macros.setting_input_textarea('whitelist_program', '자동 다운로드 코드', value=arg['whitelist_program'], desc=['쉼표 또는 줄바꿈으로 여러 코드를 입력할 수 있습니다.']) }}
     {{ macros.global_setting_scheduler_button(arg['scheduler'], arg['is_running']) }}
     {{ macros.setting_buttons([['linkkf_one_execute_btn', '1회 실행']], left='수동 실행') }}
-    {{ macros.setting_buttons([['linkkf_reset_db_btn', 'DB 초기화']], left='DB 정리') }}
+    {{ macros.setting_buttons([['linkkf_reset_db_btn', 'DB 초기화']], left='DB 관리') }}
     {{ macros.setting_buttons([['btn_airing_code', '최신 코드 가져오기']], left='보조 기능') }}
   </form>
 </div>
@@ -22,8 +22,28 @@
 <script type="text/javascript">
 const package_name = "{{ arg['package_name'] }}";
 
+function setWhitelistProgramValue(value) {
+  const text = String(value || "");
+  $("#whitelist_program").val(text);
+  $("textarea[name='whitelist_program']").val(text);
+}
+
+function refreshWhitelistProgram() {
+  $.ajax({
+    url: `/${package_name}/ajax/get_whitelist_program`,
+    type: "GET",
+    cache: false,
+    dataType: "json",
+    success: function (ret) {
+      if (ret.ret === "success") {
+        setWhitelistProgramValue(ret.data);
+      }
+    },
+  });
+}
+
 $(document).ready(function () {
-  $("body").off("change", "#globalSchedulerSwitchBtn");
+  refreshWhitelistProgram();
 });
 
 $("body").on("click", "#go_btn", function (e) {
@@ -31,10 +51,9 @@ $("body").on("click", "#go_btn", function (e) {
   window.open($("#linkkf_url").val(), "_blank");
 });
 
-$("body").on("change", "#globalSchedulerSwitchBtn", function (e) {
-  e.preventDefault();
+$("body").on("change", "#globalSchedulerSwitchBtn", function () {
   $.ajax({
-    url: "/" + package_name + "/ajax/scheduler_toggle",
+    url: `/${package_name}/ajax/scheduler_toggle`,
     type: "POST",
     cache: false,
     data: { scheduler: $(this).prop("checked") },
@@ -45,7 +64,7 @@ $("body").on("change", "#globalSchedulerSwitchBtn", function (e) {
 $("body").on("click", "#linkkf_one_execute_btn", function (e) {
   e.preventDefault();
   $.ajax({
-    url: "/" + package_name + "/ajax/execute_once",
+    url: `/${package_name}/ajax/execute_once`,
     type: "POST",
     cache: false,
     dataType: "json",
@@ -62,7 +81,7 @@ $("body").on("click", "#linkkf_one_execute_btn", function (e) {
 $("body").on("click", "#linkkf_reset_db_btn", function (e) {
   e.preventDefault();
   $.ajax({
-    url: "/" + package_name + "/ajax/reset_db",
+    url: `/${package_name}/ajax/reset_db`,
     type: "POST",
     cache: false,
     dataType: "json",
@@ -79,13 +98,13 @@ $("body").on("click", "#linkkf_reset_db_btn", function (e) {
 $("body").on("click", "#btn_airing_code", function (e) {
   e.preventDefault();
   $.ajax({
-    url: "/" + package_name + "/ajax/get_airing_code",
+    url: `/${package_name}/ajax/get_airing_code`,
     type: "GET",
     cache: false,
     dataType: "json",
     success: function (ret) {
       if (ret.ret === "success" && Array.isArray(ret.data)) {
-        $("#whitelist_program").val(ret.data.join(","));
+        setWhitelistProgramValue(ret.data.join(","));
         $.notify("<strong>최신 코드를 불러왔습니다.</strong>", { type: "success" });
       } else {
         $.notify("<strong>코드를 불러오지 못했습니다.</strong>", { type: "warning" });

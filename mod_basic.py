@@ -113,6 +113,18 @@ class ModuleBasic(PluginModuleBase):
                 if data["ret"] == "error":
                     return jsonify(data)
                 return jsonify({"ret": "success", "data": data})
+            if sub == "get_whitelist_program":
+                return jsonify(
+                    {
+                        "ret": "success",
+                        "data": (
+                            self.P.ModelSetting.get("whitelist_program")
+                            if self.P.ModelSetting is not None
+                            else ""
+                        )
+                        or "",
+                    }
+                )
             if sub == "play":
                 episode_url = req.form["url"]
                 play_title = req.form.get("title", "LinkKF")
