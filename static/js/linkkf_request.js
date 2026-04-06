@@ -468,7 +468,10 @@
   $("#go_modal_airing").attr("class", "btn btn-primary");
 
   $(function () {
-    if (typeof initialCodeFromQuery === "string" && initialCodeFromQuery.trim() !== "") {
+    const input = document.getElementById("code");
+    const autoCode = normalizeCode(input?.value || "");
+    if (input && autoCode !== "") {
+      input.value = autoCode;
       setTimeout(() => {
         runAnalysis();
       }, 0);
