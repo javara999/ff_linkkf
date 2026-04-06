@@ -255,6 +255,7 @@ class LogicLinkkf(object):
         except Exception as e:
             logger.error("Exception:%s", e)
             logger.error(traceback.format_exc())
+            return ""
 
     @staticmethod
     def get_html_requests(url, cached=False, referer=None, reset_session=False):
@@ -463,25 +464,36 @@ class LogicLinkkf(object):
         #     sess=LogicLinkkf.session,
         #     delay=10,
         # )
-        # scraper = cloudscraper.create_scraper(sess=re_sess)
-        scraper = cloudscraper.create_scraper(
-            # debug=True,
-            delay=10,
-            sess=LogicLinkkf.session,
-            browser={
-                "custom": "linkkf",
-            },
-        )
+        last_exception = None
+        for attempt in range(3):
+            try:
+                if attempt > 0:
+                    LogicLinkkf._reset_http_state()
+                    LogicLinkkf.session = requests.Session()
+                    headers["User-Agent"] = random.choice(user_agents_list)
 
-        # print(scraper.get(url, headers=LogicLinkkf.headers).content)
-        # print(scraper.get(url).content)
-        # return scraper.get(url, headers=LogicLinkkf.headers).content
-        # logger.debug(LogicLinkkf.headers)
-        return scraper.get(
-            url,
-            headers=headers,
-            timeout=10,
-        ).content.decode("utf8", errors="replace")
+                scraper = cloudscraper.create_scraper(
+                    delay=10,
+                    sess=LogicLinkkf.session,
+                    browser={
+                        "custom": "linkkf",
+                    },
+                )
+
+                return scraper.get(
+                    url,
+                    headers=headers,
+                    timeout=10,
+                ).content.decode("utf8", errors="replace")
+            except requests.exceptions.RequestException as e:
+                last_exception = e
+                if attempt < 2:
+                    time.sleep(0.4 * (attempt + 1))
+                continue
+
+        if last_exception is not None:
+            raise last_exception
+        return ""
 
     @staticmethod
     def get_video_url_from_url(url, url2):
@@ -1274,6 +1286,12 @@ class LogicLinkkf(object):
 
     @staticmethod
     def _extract_stream_config(player_html, base_url):
+        if player_html in [None, b"", ""]:
+            return None, None
+        if isinstance(player_html, bytes):
+            player_html = player_html.decode("utf8", errors="replace")
+        player_html = str(player_html)
+
         video_url = None
         vtt_url = None
 

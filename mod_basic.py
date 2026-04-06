@@ -47,6 +47,20 @@ class ModuleBasic(PluginModuleBase):
         }
 
     @staticmethod
+    def _is_optional_proxy_target(target):
+        lower = str(target or "").lower()
+        optional_exts = [
+            ".vtt",
+            ".srt",
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".webp",
+            ".gif",
+        ]
+        return any(lower.endswith(ext) for ext in optional_exts)
+
+    @staticmethod
     def _rewrite_m3u8(content, target_url, referer):
         def replace_uri_attr(line):
             def repl(match):
@@ -262,10 +276,25 @@ class ModuleBasic(PluginModuleBase):
                 headers = self._get_proxy_headers(referer)
                 if req.headers.get("Range") is not None:
                     headers["Range"] = req.headers.get("Range")
-                upstream = requests.get(target, headers=headers, stream=True, timeout=30)
+                upstream = None
+                last_exception = None
+                for attempt in range(3):
+                    try:
+                        upstream = requests.get(target, headers=headers, stream=True, timeout=30)
+                        break
+                    except requests.exceptions.RequestException as e:
+                        last_exception = e
+                        if attempt < 2:
+                            continue
+                if upstream is None:
+                    if self._is_optional_proxy_target(target):
+                        return Response(status=204)
+                    raise last_exception
                 content_type = upstream.headers.get("content-type", "")
 
                 if upstream.status_code >= 400:
+                    if self._is_optional_proxy_target(target):
+                        return Response(status=204)
                     return Response(
                         upstream.content,
                         status=upstream.status_code,
