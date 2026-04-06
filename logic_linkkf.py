@@ -77,6 +77,34 @@ class LogicLinkkf(object):
     current_data = None
 
     @staticmethod
+    def _reset_http_state():
+        try:
+            if LogicLinkkf.session is not None:
+                LogicLinkkf.session.close()
+        except Exception:
+            pass
+        LogicLinkkf.session = None
+
+    @staticmethod
+    def _looks_like_stream_page(html_text):
+        text = str(html_text or "")
+        return (
+            "videoUrl" in text
+            or "new Artplayer" in text
+            or ".m3u8" in text
+            or ".mp4" in text
+        )
+
+    @staticmethod
+    def _looks_like_watch_page(html_text):
+        text = str(html_text or "")
+        return (
+            "var player_aaaa=" in text
+            or "player_post(" in text
+            or "data-url=" in text
+        )
+
+    @staticmethod
     def _parse_total_page(soup):
         max_page = 1
         for link in soup.select('a[href*="/page/"]'):
@@ -213,21 +241,26 @@ class LogicLinkkf(object):
         return details if len(details) > 0 else [{"정보없음": ""}]
 
     @staticmethod
-    def get_html(url, cached=False):
+    def get_html(url, cached=False, referer=None, reset_session=False):
 
         try:
-            if LogicLinkkf.referer is None:
+            if referer is not None:
+                LogicLinkkf.referer = referer
+            elif LogicLinkkf.referer is None:
                 LogicLinkkf.referer = f"{ModelSetting.get('linkkf_url')}"
 
             # return LogicLinkkf.get_html_requests(url)
-            return LogicLinkkf.get_html_cloudflare(url)
+            return LogicLinkkf.get_html_cloudflare(url, cached=cached, reset_session=reset_session)
 
         except Exception as e:
             logger.error("Exception:%s", e)
             logger.error(traceback.format_exc())
 
     @staticmethod
-    def get_html_requests(url, cached=False):
+    def get_html_requests(url, cached=False, referer=None, reset_session=False):
+        if reset_session:
+            LogicLinkkf._reset_http_state()
+
         if LogicLinkkf.session is None:
             if cached:
                 logger.debug("cached===========++++++++++++")
@@ -243,14 +276,15 @@ class LogicLinkkf(object):
             else:
                 LogicLinkkf.session = requests.Session()
 
-        LogicLinkkf.referer = f"{ModelSetting.get('linkkf_url')}"
-
-        LogicLinkkf.headers["Referer"] = LogicLinkkf.referer
+        current_referer = referer or LogicLinkkf.referer or f"{ModelSetting.get('linkkf_url')}"
+        LogicLinkkf.referer = current_referer
+        headers = dict(LogicLinkkf.headers)
+        headers["Referer"] = current_referer
 
         # logger.debug(
         #     f"get_html()::LogicLinkkf.referer = {LogicLinkkf.referer}"
         # )
-        page = LogicLinkkf.session.get(url, headers=LogicLinkkf.headers)
+        page = LogicLinkkf.session.get(url, headers=headers)
         # logger.info(f"page: {page}")
 
         return page.content.decode("utf8", errors="replace")
@@ -382,7 +416,7 @@ class LogicLinkkf(object):
             pass
 
     @staticmethod
-    def get_html_cloudflare(url, cached=False):
+    def get_html_cloudflare(url, cached=False, reset_session=False):
         # scraper = cloudscraper.create_scraper(
         #     # disableCloudflareV1=True,
         #     # captcha={"provider": "return_response"},
@@ -406,9 +440,12 @@ class LogicLinkkf(object):
         ]
         # ua = UserAgent(verify_ssl=False)
 
-        LogicLinkkf.headers["User-Agent"] = random.choice(user_agents_list)
+        if reset_session:
+            LogicLinkkf._reset_http_state()
 
-        LogicLinkkf.headers["Referer"] = LogicLinkkf.referer
+        headers = dict(LogicLinkkf.headers)
+        headers["User-Agent"] = random.choice(user_agents_list)
+        headers["Referer"] = LogicLinkkf.referer or f"{ModelSetting.get('linkkf_url')}"
 
         # logger.debug(f"headers:: {LogicLinkkf.headers}")
 
@@ -442,7 +479,7 @@ class LogicLinkkf(object):
         # logger.debug(LogicLinkkf.headers)
         return scraper.get(
             url,
-            headers=LogicLinkkf.headers,
+            headers=headers,
             timeout=10,
         ).content.decode("utf8", errors="replace")
 
@@ -456,20 +493,29 @@ class LogicLinkkf(object):
             target = urllib.parse.urljoin(url, target)
 
         try:
-            player_html = LogicLinkkf.get_html(target)
-            video_url, vtt_url = LogicLinkkf._extract_stream_config(player_html, target)
-            if video_url is not None:
-                return [video_url, target, vtt_url]
-
-            server_urls = re.findall(r'data-url=["\']([^"\']+)["\']', player_html)
-            for server_url in server_urls:
-                next_target = server_url.replace("&amp;", "&")
-                if next_target.startswith("/"):
-                    next_target = urllib.parse.urljoin(target, next_target)
-                nested_html = LogicLinkkf.get_html(next_target)
-                video_url, vtt_url = LogicLinkkf._extract_stream_config(nested_html, next_target)
+            for attempt in range(3):
+                player_html = LogicLinkkf.get_html(
+                    target,
+                    referer=url,
+                    reset_session=(attempt > 0),
+                )
+                video_url, vtt_url = LogicLinkkf._extract_stream_config(player_html, target)
                 if video_url is not None:
-                    return [video_url, next_target, vtt_url]
+                    return [video_url, target, vtt_url]
+
+                server_urls = re.findall(r'data-url=["\']([^"\']+)["\']', str(player_html or ""))
+                for server_url in server_urls:
+                    next_target = server_url.replace("&amp;", "&")
+                    if next_target.startswith("/"):
+                        next_target = urllib.parse.urljoin(target, next_target)
+                    nested_html = LogicLinkkf.get_html(
+                        next_target,
+                        referer=target,
+                        reset_session=(attempt > 0),
+                    )
+                    video_url, vtt_url = LogicLinkkf._extract_stream_config(nested_html, next_target)
+                    if video_url is not None:
+                        return [video_url, next_target, vtt_url]
         except Exception as e:
             logger.error("Exception:%s", e)
             logger.error(traceback.format_exc())
@@ -503,13 +549,6 @@ class LogicLinkkf(object):
                 return LogicLinkkf.current_data
             else:
                 ret["ret"] = False
-                ret["data"] = whitelist_programs
-                ret["whitelist_program"] = ",".join(whitelist_programs)
-                ret["data"] = whitelist_programs
-                ret["whitelist_program"] = ",".join(whitelist_programs)
-                ret["data"] = whitelist_programs
-                ret["whitelist_program"] = ",".join(whitelist_programs)
-                ret["data"] = whitelist_programs
                 ret["log"] = "No current data!!"
         except Exception as e:
             logger.error("Exception:%s", e)
@@ -1303,32 +1342,60 @@ class LogicLinkkf(object):
             logger.info("get_video_url(): url: %s", url)
 
             if "playhd2.php" in url or "play.php" in url:
-                player_html = LogicLinkkf.get_html(url)
-                video_url, vtt_url = LogicLinkkf._extract_stream_config(player_html, url)
-                if video_url is not None:
-                    return [video_url, url, vtt_url]
+                for attempt in range(3):
+                    player_html = LogicLinkkf.get_html(
+                        url,
+                        referer=ModelSetting.get("linkkf_url"),
+                        reset_session=(attempt > 0),
+                    )
+                    video_url, vtt_url = LogicLinkkf._extract_stream_config(player_html, url)
+                    if video_url is not None:
+                        return [video_url, url, vtt_url]
 
-            html_text = LogicLinkkf.get_html(url)
-            payload = LogicLinkkf._extract_player_payload(html_text)
+            html_text = ""
+            payload = None
+            for attempt in range(3):
+                html_text = LogicLinkkf.get_html(
+                    url,
+                    referer=ModelSetting.get("linkkf_url"),
+                    reset_session=(attempt > 0),
+                )
+                payload = LogicLinkkf._extract_player_payload(html_text)
+                if payload is not None or LogicLinkkf._looks_like_watch_page(html_text):
+                    break
 
             if payload is not None:
                 for target in LogicLinkkf._get_player_candidates(payload):
-                    player_html = LogicLinkkf.get_html(target)
-                    video_url, vtt_url = LogicLinkkf._extract_stream_config(player_html, target)
-                    if video_url is not None:
-                        return [video_url, target, vtt_url]
+                    for attempt in range(3):
+                        player_html = LogicLinkkf.get_html(
+                            target,
+                            referer=url,
+                            reset_session=(attempt > 0),
+                        )
+                        video_url, vtt_url = LogicLinkkf._extract_stream_config(player_html, target)
+                        if video_url is not None:
+                            return [video_url, target, vtt_url]
+                        if LogicLinkkf._looks_like_stream_page(player_html):
+                            break
 
-                server_urls = re.findall(r'data-url=["\']([^"\']+)["\']', html_text)
+                server_urls = re.findall(r'data-url=["\']([^"\']+)["\']', str(html_text or ""))
                 for server_url in server_urls:
                     target = server_url.replace("&amp;", "&")
                     if target.startswith("/"):
                         target = urllib.parse.urljoin(url, target)
-                    player_html = LogicLinkkf.get_html(target)
-                    video_url, vtt_url = LogicLinkkf._extract_stream_config(player_html, target)
-                    if video_url is not None:
-                        return [video_url, target, vtt_url]
+                    for attempt in range(3):
+                        player_html = LogicLinkkf.get_html(
+                            target,
+                            referer=url,
+                            reset_session=(attempt > 0),
+                        )
+                        video_url, vtt_url = LogicLinkkf._extract_stream_config(player_html, target)
+                        if video_url is not None:
+                            return [video_url, target, vtt_url]
+                        if LogicLinkkf._looks_like_stream_page(player_html):
+                            break
 
-            pattern = re.compile(r"player_post\('https:\/\/.*?'\)").findall(html_text)
+            pattern = re.compile(r"player_post\('https:\/\/.*?'\)").findall(str(html_text or ""))
             fallback_urls = []
             for tag in pattern:
                 target = tag[13:-2]
