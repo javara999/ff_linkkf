@@ -23,7 +23,7 @@ from .lib.utils import linkkf_async_timeit
 # import snoop
 # from snoop import spy
 
-from framework import db, get_logger
+from framework import F, db, get_logger
 from framework.util import Util
 
 # 패키지
@@ -1517,44 +1517,42 @@ class LogicLinkkf(object):
     @staticmethod
     def scheduler_function():
         try:
-            logger.debug("Linkkf scheduler_function start..")
+            with F.app.app_context():
+                logger.debug("Linkkf scheduler_function start..")
 
-            whitelist_program = ModelSetting.get("whitelist_program")
-            whitelist_programs = [
-                x.strip().replace(" ", "")
-                for x in whitelist_program.replace("\n", ",").split(",")
-            ]
+                whitelist_program = ModelSetting.get("whitelist_program") or ""
+                whitelist_programs = [
+                    x.strip().replace(" ", "")
+                    for x in whitelist_program.replace("\n", ",").split(",")
+                    if x.strip() != ""
+                ]
 
-            logger.debug(f"whitelist_programs: {whitelist_programs}")
+                logger.debug(f"whitelist_programs: {whitelist_programs}")
 
-            for code in whitelist_programs:
-                logger.info("auto download start : %s", code)
-                downloaded = (
-                    db.session.query(ModelLinkkf)
-                    .filter(ModelLinkkf.completed.is_(True))
-                    .filter_by(programcode=code)
-                    .with_for_update()
-                    .all()
-                )
-                logger.debug(f"downloaded:: {downloaded}")
-                dl_codes = [dl.episodecode for dl in downloaded]
-                # logger.debug("dl_codes:: %s", dl_codes)
-                logger.info("downloaded codes :%s", dl_codes)
+                for code in whitelist_programs:
+                    logger.info("auto download start : %s", code)
+                    downloaded = (
+                        db.session.query(ModelLinkkf)
+                        .filter(ModelLinkkf.completed.is_(True))
+                        .filter_by(programcode=code)
+                        .with_for_update()
+                        .all()
+                    )
+                    logger.debug(f"downloaded:: {downloaded}")
+                    dl_codes = [dl.episodecode for dl in downloaded]
+                    logger.info("downloaded codes :%s", dl_codes)
 
-                # if len(dl_codes) > 0:
-                data = LogicLinkkf.get_title_info(code)
-                logger.debug(f"data:: {data}")
+                    data = LogicLinkkf.get_title_info(code)
+                    logger.debug(f"data:: {data}")
 
-                for episode in data["episode"]:
-                    e_code = episode["code"]
-                    if e_code not in dl_codes:
-                        logger.info("Logic Queue added :%s", e_code)
+                    for episode in data["episode"]:
+                        e_code = episode["code"]
+                        if e_code not in dl_codes:
+                            logger.info("Logic Queue added :%s", e_code)
+                            logger.debug(f"episode:: {episode}")
+                            LogicQueue.add_queue(episode)
 
-                        logger.debug(f"episode:: {episode}")
-                        print("temp==============")
-                        LogicQueue.add_queue(episode)
-
-            logger.debug("========================================")
+                logger.debug("========================================")
         except Exception as e:
             logger.error("Exception:%s", e)
             logger.error(traceback.format_exc())
